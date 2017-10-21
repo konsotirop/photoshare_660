@@ -20,7 +20,7 @@ import os, base64
 
 mysql = MySQL()
 app = Flask(__name__)
-app.secret_key = 'super secret string'  # Change this!
+app.secret_key = 'secret111'  # Change this!
 
 # These will need to be changed according to your creditionals
 app.config['MYSQL_DATABASE_USER'] = 'root'
@@ -84,6 +84,35 @@ def new_page_function():
 '''
 
 
+@app.route('/top_users', methods=['GET'])
+def top_users():
+    query = 'SELECT uid, cnt FROM ( ' \
+                'SELECT uid, COUNT(*) AS photo_freq(uid, cnt) FROM PHOTO GROUP BY uid' \
+                'UNION ALL ' \
+                'SELECT uid, COUNT(*) AS comment_freq(uid, cnt) FROM COMMENT GROUP BY uid)' \
+            'ORDER BY cnt' \
+            'LIMIT 10'
+    cursor.execute(query)
+    # will return list of (uid, score) tuples
+    data = cursor.fetchall()
+
+    # TODO: (ben) need to return an HTML template that takes data as parameter
+
+
+@app.route('/all_photos', methods=['GET'])
+def browse_photos():
+    query = 'SELECT img_data FROM PHOTO'
+
+    cursor.execute(query)
+
+    data = cursor.fetchall()
+
+    # TODO: (ben) need to return HTML template that takes data as parameter
+
+
+
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if flask.request.method == 'GET':
@@ -116,6 +145,7 @@ def login():
 @app.route('/logout')
 def logout():
     flask_login.logout_user()
+
     return render_template('hello.html', message='Logged out')
 
 
@@ -136,17 +166,19 @@ def register_user():
         email = request.form.get('email')
         password = request.form.get('password')
     except:
-        print(
-            "couldn't find all tokens")  # this prints to shell, end users will not see this (all print statements go to shell)
+        print("couldn't find all tokens")
+        # this prints to shell, end users will not see this (all print statements go to shell)
         return flask.redirect(flask.url_for('register'))
     cursor = conn.cursor()
     test = isEmailUnique(email)
     if test:
         #print(cursor.execute("INSERT INTO Users (email, password) VALUES ('email', 'password')"))
 
-        #cursor.execute("INSERT INTO Pictures (imgdata, user_id, caption) VALUES (%s, %s, %s)",
-        #               (photo_data, uid, caption))
-        print(cursor.execute("INSERT INTO Users (email, password) VALUES (%s , %s)", (email, password)))
+        #cursor.execute("INSERT INTO Pictures (
+        # imgdata, user_id, caption) VALUES (%s, %s, %s)",(photo_data, uid, caption))
+        query = "INSERT INTO Users (email, password) VALUES (%s , %s)", (email, password)
+        print(query)
+        cursor.execute(query)
         conn.commit()
         # log user in
         user = User()
@@ -156,6 +188,11 @@ def register_user():
     else:
         print("couldn't find all tokens")
         return flask.redirect(flask.url_for('register'))
+
+
+@app.route("/addfriends", methods=['POST'])
+def addfriends():
+    return
 
 
 def getUsersPhotos(uid):
@@ -208,11 +245,8 @@ def upload_file():
         print(caption)
         photo_data = base64.standard_b64encode(imgfile.read())
         cursor = conn.cursor()
-        #cursor.execute(
-        #    "INSERT INTO Pictures (imgdata, user_id, caption) VALUES ('photo_data', 'uid', 'caption')")
         cursor.execute("INSERT INTO Pictures (imgdata, user_id, caption) VALUES (%s, %s, %s)",
                        (photo_data, uid, caption))
-        #cursor.execute("INSERT INTO Pictures (imgdata, user_id, caption) VALUES (?, ?, ?)", (photo_data, uid, caption))
         conn.commit()
         return render_template('hello.html', name=flask_login.current_user.id, message='Photo uploaded!',
                                photos=getUsersPhotos(uid))
