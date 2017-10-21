@@ -86,6 +86,8 @@ def new_page_function():
 
 @app.route('/top_users', methods=['GET'])
 def top_users():
+    cursor = conn.cursor()
+
     query = 'SELECT uid, cnt FROM ( ' \
                 'SELECT uid, COUNT(*) AS photo_freq(uid, cnt) FROM PHOTO GROUP BY uid' \
                 'UNION ALL ' \
@@ -108,9 +110,7 @@ def browse_photos():
     data = cursor.fetchall()
 
     # TODO: (ben) need to return HTML template that takes data as parameter
-
-
-
+    # TODO: (ben) could add functionality to order by number of likes
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -124,7 +124,7 @@ def login():
 			   </form></br>
 		   <a href='/'>Home</a>
 			   '''
-    # The request method is POST (page is recieving data)
+    # The request method is POST (page is receiving data)
     email = flask.request.form['email']
     cursor = conn.cursor()
     # check if email is registered
@@ -193,6 +193,24 @@ def register_user():
 @app.route("/addfriends", methods=['POST'])
 def addfriends():
     return
+
+
+@app.route('/by_tag', methods=['GET'])
+def browse_by_tag(uid, tag):
+    # 2nd elem in each tuple is pid
+    pids = set([p[1] for p in getUsersPhotos(uid)])
+
+    # find photos in pids with desired tag
+    cursor = conn.cursor()
+
+    # TODO: does MySQL support python set 'in' syntax?
+    query = 'SELECT pid FROM Associate WHERE hashtag = %s AND pid in %s', (tag, pids)
+
+    cursor.execute(query)
+
+    data = cursor.fetchall()
+
+    #TODO: return HTML template that takes data as a parameter
 
 
 def getUsersPhotos(uid):
