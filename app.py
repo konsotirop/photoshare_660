@@ -20,7 +20,7 @@ import os, base64
 
 mysql = MySQL()
 app = Flask(__name__)
-app.secret_key = 'secret111'  # Change this!
+app.secret_key = 'shamir'  # Change this!
 
 # These will need to be changed according to your creditionals
 app.config['MYSQL_DATABASE_USER'] = 'root'
@@ -36,13 +36,13 @@ login_manager.init_app(app)
 
 conn = mysql.connect()
 cursor = conn.cursor()
-cursor.execute("SELECT email FROM Users")
+cursor.execute("SELECT email FROM USERS")
 users = cursor.fetchall()
 
 
 def getUserList():
     cursor = conn.cursor()
-    cursor.execute("SELECT email FROM Users")
+    cursor.execute("SELECT email FROM USERS")
     return cursor.fetchall()
 
 
@@ -63,6 +63,7 @@ def user_loader(email):
 @login_manager.request_loader
 def request_loader(request):
     users = getUserList()
+    print(users)
     email = request.form.get('email')
     if not (email) or email not in str(users):
         return
@@ -70,7 +71,7 @@ def request_loader(request):
     user.id = email
     cursor = mysql.connect().cursor()
 
-    cursor.execute("SELECT password FROM Users WHERE email = email")
+    cursor.execute("SELECT password FROM USERS WHERE email = email")
     data = cursor.fetchall()
     pwd = str(data[0][0])
     user.is_authenticated = request.form['password'] == pwd
@@ -129,7 +130,7 @@ def login():
     email = flask.request.form['email']
     cursor = conn.cursor()
     # check if email is registered
-    if cursor.execute("SELECT password FROM Users WHERE email=email"):
+    if cursor.execute("SELECT password FROM USERS WHERE email=email"):
         data = cursor.fetchall()
         pwd = str(data[0][0])
         if flask.request.form['password'] == pwd:
@@ -158,7 +159,12 @@ def unauthorized_handler():
 # you can specify specific methods (GET/POST) in function header instead of inside the functions as seen earlier
 @app.route("/register", methods=['GET'])
 def register():
-    return render_template('register.html', supress='True')
+    return render_template('register.html', supress=True)
+
+
+@app.route("/register_fail", methods=['GET'])
+def re_register():
+    return render_template('register.html', supress=False)
 
 
 @app.route("/register", methods=['POST'])
@@ -176,7 +182,8 @@ def register_user():
         print(dob)
     except:
         print(
-           "couldn't find all tokens")  # this prints to shell, end users will not see this (all print statements go to shell)
+            "couldn't find all tokens")
+        # this prints to shell, end users will not see this (all print statements go to shell)
         return flask.redirect(flask.url_for('register'))
     try:
         gender = request.form.get('gender')
@@ -193,7 +200,9 @@ def register_user():
 
         #cursor.execute("INSERT INTO Pictures (imgdata, user_id, caption) VALUES (%s, %s, %s)",
         #               (photo_data, uid, caption))
-        print(cursor.execute("INSERT INTO USER (email, password, gender, dob, hometown, fname, lname) VALUES (%s , %s, %s, %s, %s, %s, %s)", (email, password, gender, dob, hometown, fname, lname)))
+        print(cursor.execute("INSERT INTO USERS (email, password, gender, dob, hometown, fname, lname) "
+							 "VALUES (%s , %s, %s, %s, %s, %s, %s)",
+							 (email, password, gender, dob, hometown, fname, lname)))
         conn.commit()
         # log user in
         user = User()
@@ -201,8 +210,9 @@ def register_user():
         flask_login.login_user(user)
         return render_template('hello.html', name=email, message='Account Created!')
     else:
-        print("couldn't find all tokens sto else")
-        return flask.redirect(flask.url_for('register'))
+        print("couldn't find all tokens")
+        return flask.redirect(flask.url_for('re_register'))
+
 
 
 @app.route("/addfriends", methods=['POST'])
@@ -219,7 +229,7 @@ def browse_by_tag(uid, tag):
     cursor = conn.cursor()
 
     # TODO: does MySQL support python set 'in' syntax?
-    query = 'SELECT pid FROM Associate WHERE hashtag = %s AND pid in %s', (tag, pids)
+    query = 'SELECT pid FROM ASSOCIATE WHERE hashtag = %s AND pid in %s', (tag, pids)
 
     cursor.execute(query)
 
@@ -231,20 +241,20 @@ def browse_by_tag(uid, tag):
 def getUsersPhotos(uid):
     cursor = conn.cursor()
 
-    cursor.execute("SELECT imgdata, picture_id, caption FROM Pictures WHERE user_id = 'uid'")
+    cursor.execute("SELECT imgdata, picture_id, caption FROM PHOTO WHERE user_id = 'uid'")
     return cursor.fetchall()  # NOTE list of tuples, [(imgdata, pid), ...]
 
 
 def getUserIdFromEmail(email):
     cursor = conn.cursor()
-    cursor.execute("SELECT user_id  FROM Users WHERE email = email")
+    cursor.execute("SELECT user_id  FROM USERS WHERE email = email")
     return cursor.fetchone()[0]
 
 
 def isEmailUnique(email):
     # use this to check if a email has already been registered
     cursor = conn.cursor()
-    query = "SELECT email FROM User WHERE email = '"+ email +"'"
+    query = "SELECT email FROM USERS WHERE email = '"+ email +"'"
     print(query)
     if cursor.execute( query) :
         # this means there are greater than zero entries with that email
@@ -258,7 +268,9 @@ def isEmailUnique(email):
 @app.route('/profile')
 @flask_login.login_required
 def protected():
-    return render_template('hello.html', name=flask_login.current_user.id, message="Here's your profile")
+    return render_template('hello.html',
+						   name=flask_login.current_user.id,
+						   message="Here's your profile")
 
 
 # begin photo uploading code
@@ -280,14 +292,22 @@ def upload_file():
         print(caption)
         photo_data = base64.standard_b64encode(imgfile.read())
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO Pictures (imgdata, user_id, caption) VALUES (%s, %s, %s)",
+        cursor.execute("INSERT INTO PHOTO (IMG_DATA, UID, CAPTION) VALUES (%s, %s, %s)",
                        (photo_data, uid, caption))
         conn.commit()
-        return render_template('hello.html', name=flask_login.current_user.id, message='Photo uploaded!',
+        return render_template('hello.html',
+							   name=flask_login.current_user.id,
+							   message='Photo uploaded!',
                                photos=getUsersPhotos(uid))
     # The method is GET so we return a  HTML form to upload the a photo.
     else:
         return render_template('upload.html')
+
+
+
+'''
+PID, CAPTION, IMG_DATA, AID, UID
+'''
 
 
 # end photo uploading code
@@ -296,7 +316,7 @@ def upload_file():
 # default page
 @app.route("/", methods=['GET'])
 def hello():
-    return render_template('hello.html', message='Welecome to Photoshare')
+    return render_template('hello.html', message='Welcome to Photoshare')
 
 
 if __name__ == "__main__":
