@@ -165,21 +165,35 @@ def register():
 def register_user():
     try:
         email = request.form.get('email')
+        print(email)
         password = request.form.get('password')
+        print(password)
+        fname = request.form.get('fname')
+        print(fname)
+        lname = request.form.get('lname')
+        print(lname)
+        dob = request.form.get('dob')
+        print(dob)
     except:
-        print("couldn't find all tokens")
-        # this prints to shell, end users will not see this (all print statements go to shell)
+        print(
+           "couldn't find all tokens")  # this prints to shell, end users will not see this (all print statements go to shell)
         return flask.redirect(flask.url_for('register'))
+    try:
+        gender = request.form.get('gender')
+    except:
+            gender = None
+    try:        
+        hometown = request.form.get('hometown')
+    except:
+        hometown = None
     cursor = conn.cursor()
     test = isEmailUnique(email)
     if test:
         #print(cursor.execute("INSERT INTO Users (email, password) VALUES ('email', 'password')"))
 
-        #cursor.execute("INSERT INTO Pictures (
-        # imgdata, user_id, caption) VALUES (%s, %s, %s)",(photo_data, uid, caption))
-        query = "INSERT INTO Users (email, password) VALUES (%s , %s)", (email, password)
-        print(query)
-        cursor.execute(query)
+        #cursor.execute("INSERT INTO Pictures (imgdata, user_id, caption) VALUES (%s, %s, %s)",
+        #               (photo_data, uid, caption))
+        print(cursor.execute("INSERT INTO USER (email, password, gender, dob, hometown, fname, lname) VALUES (%s , %s, %s, %s, %s, %s, %s)", (email, password, gender, dob, hometown, fname, lname)))
         conn.commit()
         # log user in
         user = User()
@@ -187,7 +201,7 @@ def register_user():
         flask_login.login_user(user)
         return render_template('hello.html', name=email, message='Account Created!')
     else:
-        print("couldn't find all tokens")
+        print("couldn't find all tokens sto else")
         return flask.redirect(flask.url_for('register'))
 
 
@@ -230,7 +244,9 @@ def getUserIdFromEmail(email):
 def isEmailUnique(email):
     # use this to check if a email has already been registered
     cursor = conn.cursor()
-    if cursor.execute("SELECT email  FROM Users WHERE email = email"):
+    query = "SELECT email FROM User WHERE email = '"+ email +"'"
+    print(query)
+    if cursor.execute( query) :
         # this means there are greater than zero entries with that email
         return False
     else:
