@@ -24,9 +24,10 @@ app.secret_key = 'secret111'  # Change this!
 
 # These will need to be changed according to your creditionals
 app.config['MYSQL_DATABASE_USER'] = 'root'
-app.config['MYSQL_DATABASE_PASSWORD'] = 'hello'
+app.config['MYSQL_DATABASE_PASSWORD'] = 'OreoCooks12'
 app.config['MYSQL_DATABASE_DB'] = 'photoshare'
-app.config['MYSQL_DATABASE_HOST'] = 'localhost'
+# below changed from 'localhost'
+app.config['MYSQL_DATABASE_HOST'] = '127.0.0.1'
 mysql.init_app(app)
 
 # begin code used for login
@@ -88,11 +89,11 @@ def new_page_function():
 def top_users():
     cursor = conn.cursor()
 
-    query = 'SELECT uid, cnt FROM ( ' \
+    query = 'SELECT uid, SUM(cnt) FROM ( ' \
                 'SELECT uid, COUNT(*) AS photo_freq(uid, cnt) FROM PHOTO GROUP BY uid' \
                 'UNION ALL ' \
                 'SELECT uid, COUNT(*) AS comment_freq(uid, cnt) FROM COMMENT GROUP BY uid)' \
-            'ORDER BY cnt' \
+            'GROUP BY uid' \
             'LIMIT 10'
     cursor.execute(query)
     # will return list of (uid, score) tuples
