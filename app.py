@@ -196,10 +196,6 @@ def register_user():
     cursor = conn.cursor()
     test = isEmailUnique(email)
     if test:
-        #print(cursor.execute("INSERT INTO Users (email, password) VALUES ('email', 'password')"))
-
-        #cursor.execute("INSERT INTO Pictures (imgdata, user_id, caption) VALUES (%s, %s, %s)",
-        #               (photo_data, uid, caption))
         print(cursor.execute("INSERT INTO USERS (email, password, gender, dob, hometown, fname, lname) "
 							 "VALUES (%s , %s, %s, %s, %s, %s, %s)",
 							 (email, password, gender, dob, hometown, fname, lname)))
@@ -210,7 +206,7 @@ def register_user():
         flask_login.login_user(user)
         return render_template('hello.html', name=email, message='Account Created!')
     else:
-        print("couldn't find all tokens")
+        print("User is not unique")
         return flask.redirect(flask.url_for('re_register'))
 
 
@@ -241,13 +237,13 @@ def browse_by_tag(uid, tag):
 def getUsersPhotos(uid):
     cursor = conn.cursor()
 
-    cursor.execute("SELECT imgdata, picture_id, caption FROM PHOTO WHERE user_id = 'uid'")
-    return cursor.fetchall()  # NOTE list of tuples, [(imgdata, pid), ...]
+    cursor.execute("SELECT img_data, pid, caption FROM PHOTO WHERE uid = '" + str(uid) + "'")
+    return cursor.fetchall()
 
 
 def getUserIdFromEmail(email):
     cursor = conn.cursor()
-    cursor.execute("SELECT user_id  FROM USERS WHERE email = email")
+    cursor.execute("SELECT uid  FROM USERS WHERE email = email")
     return cursor.fetchone()[0]
 
 
@@ -268,9 +264,21 @@ def isEmailUnique(email):
 @app.route('/profile')
 @flask_login.login_required
 def protected():
+
+    uid = getUserIdFromEmail(flask_login.current_user.id)
+    cursor.execute("SELECT IMG_DATA FROM PHOTO WHERE uid = '" + str(uid) + "'")
+    photos = cursor.fetchall()
+    print(photos)
+    cursor.execute("SELECT A_NAME FROM ALBUM WHERE uid = '" + str(uid) + "'")
+    albums = cursor.fetchall()[0]
+    print(albums)
+
     return render_template('hello.html',
 						   name=flask_login.current_user.id,
-						   message="Here's your profile")
+						   message="Here's your profile",
+                           photos=photos,
+                           albums=albums,
+                           logged_in=True)
 
 
 # begin photo uploading code
@@ -289,11 +297,16 @@ def upload_file():
         uid = getUserIdFromEmail(flask_login.current_user.id)
         imgfile = request.files['photo']
         caption = request.form.get('caption')
+        parent_album = request.form.get('album_name')
         print(caption)
         photo_data = base64.standard_b64encode(imgfile.read())
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO PHOTO (IMG_DATA, UID, CAPTION) VALUES (%s, %s, %s)",
-                       (photo_data, uid, caption))
+        aid_query = \
+            cursor.execute("SELECT AID FROM ALBUM WHERE A_NAME = %s AND UID = %s",
+                           (parent_album, uid))
+
+        cursor.execute("INSERT INTO PHOTO (IMG_DATA, UID, CAPTION, AID) VALUES (%s, %s, %s, %s)",
+                       (photo_data, uid, caption, aid_query))
         conn.commit()
         return render_template('hello.html',
 							   name=flask_login.current_user.id,
@@ -304,13 +317,19 @@ def upload_file():
         return render_template('upload.html')
 
 
-
-'''
-PID, CAPTION, IMG_DATA, AID, UID
-'''
-
-
-# end photo uploading code
+@app.route('/create_album', methods=['GET','POST'])
+@flask_login.login_required
+def create_album():
+    if request.method == 'POST':
+        uid = getUserIdFromEmail(flask_login.current_user.id)
+        album_name = request.form.get('Name')
+        print(album_name)
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO ALBUM (A_NAME, UID) VALUES (%s, %s)", (album_name, uid))
+        conn.commit()
+        return flask.redirect(flask.url_for('protected'))
+    else:
+        return render_template('create_album.html')
 
 
 # default page
