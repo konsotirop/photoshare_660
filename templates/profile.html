@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Profile Page</title>
+    <h1> This is the profile of {{ fname }} {{ lname }}</h1>
+</head>
+<body>
+    <!-- see all albums -->
+    {% if albums %}
+    <h2> Here's your albums</h2>
+        <form method="post" action="{{ url_for('view_album') }}">
+        <select name="album_id" size="3" onchange="this.form.submit();">
+            {% for album in albums %}
+                <option value="{{album[1]}}">{{album[0]}} </option>
+    {% endfor %}
+        </select>
+        </form>
+    {% endif %}
+    <!-- create an album -->
+    <h3> Create a new album </h3>
+    <li><a href='/create_album'>Create</a> </li>
+    <!-- list her/his friends -->
+    {% if friends %}
+    <h3>Friends</h3>
+        <form method="post" action="{{ url_for('visit_user') }}">
+        <select name="user_mail" size="2" onchange="this.form.submit();">
+             {% for friend in friends %}
+                <option value="{{friend[2]}}">{{friend[0]}} {{friend[1]}} {{friend[2]}} </option>
+            {% endfor %}
+        </select>
+        </form>
+    {% endif %}
+   <!-- friends functionality -->
+    <form method="post" action="{{ url_for('search_User') }}">
+        Search for other users:
+            <input type="search" name="userSearch">
+            <input type="submit">
+    </form>
+    {% if nf %}
+        <p> No user found </p>
+    {% endif %}
+{% if users %}
+<h2>Here are the users meeting your criteria</h2>
+    <form method="post" action="{{ url_for('visit_user') }}">
+    <select name="user_mail" size="10" onchange="this.form.submit();">
+         {% for user in users %}
+            <option value="{{user[2]}}">{{user[0]}} {{user[1]}} {{user[2]}} </option>
+        {% endfor %}
+    </select>
+    </form>
+{% endif %}
+
+    <!-- friend recommendation section -->
+    {% if recommendations %}
+<h4>People you may know</h4>
+    <form method="post" action="{{ url_for('visit_user') }}">
+    <select name="user_mail" size="10" onchange="this.form.submit();">
+         {% for user in recommendations %}
+            <option value="{{user[2]}}">{{user[0]}} {{user[1]}} {{user[2]}} </option>
+        {% endfor %}
+    </select>
+    </form>
+{% endif %}
+</body>
+
+<br>
+<li><a href='/logout'>Logout</a></li>
+</html>

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Profile Page</title>
+    <h1> This is the profile of {{ fname }} {{ lname }}</h1>
+</head>
+<body>
+    <!-- friend functionality -->
+    {% if not already %}
+    <form action="{{ url_for('friendship') }}" method="post">
+        <button name="friend" type="submit" value={{ otherEmail }}>Add friend</button>
+    </form>
+    {% endif %}
+    {% if already %}
+        <h4>{{message}}!</h4>
+    {% endif %}
+    <!-- see all albums -->
+    {% if albums %}
+    <h3> Their albums:</h3>
+            <form method="post" action="{{ url_for('view_other_album') }}">
+            <select name="album_id" size="2" onchange="this.form.submit();">
+                {% for album in albums %}
+                    <option value="{{album[0]}}">{{album[1]}} </option>
+                {% endfor %}
+            </select>
+            </form>
+    {% endif %}
+</body>
+<li><a href='/logout'>Logout</a></li>
+</html>

@@ -13,6 +13,7 @@ import flask
 from flask import Flask, Response, request, render_template, redirect, url_for
 from flaskext.mysql import MySQL
 import flask.ext.login as flask_login
+import datetime
 
 # for image uploading
 # from werkzeug import secure_filename
@@ -78,43 +79,6 @@ def request_loader(request):
     return user
 
 
-'''
-A new page looks like this:
-@app.route('new_page_name')
-def new_page_function():
-	return new_page_html
-'''
-
-
-@app.route('/top_users', methods=['GET'])
-def top_users():
-    cursor = conn.cursor()
-
-    query = 'SELECT uid, SUM(cnt) FROM ( ' \
-                'SELECT uid, COUNT(*) AS photo_freq(uid, cnt) FROM PHOTO GROUP BY uid' \
-                'UNION ALL ' \
-                'SELECT uid, COUNT(*) AS comment_freq(uid, cnt) FROM COMMENT GROUP BY uid)' \
-            'GROUP BY uid' \
-            'LIMIT 10'
-    cursor.execute(query)
-    # will return list of (uid, score) tuples
-    data = cursor.fetchall()
-
-    # TODO: (ben) need to return an HTML template that takes data as parameter
-
-
-@app.route('/all_photos', methods=['GET'])
-def browse_photos():
-    query = 'SELECT img_data FROM PHOTO'
-
-    cursor.execute(query)
-
-    data = cursor.fetchall()
-
-    # TODO: (ben) need to return HTML template that takes data as parameter
-    # TODO: (ben) could add functionality to order by number of likes
-
-
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if flask.request.method == 'GET':
@@ -130,7 +94,8 @@ def login():
     email = flask.request.form['email']
     cursor = conn.cursor()
     # check if email is registered
-    if cursor.execute("SELECT password FROM USERS WHERE email=email"):
+    query = "SELECT password from USERS WHERE email ='" + email +"'"
+    if cursor.execute(query):
         data = cursor.fetchall()
         pwd = str(data[0][0])
         if flask.request.form['password'] == pwd:
@@ -171,15 +136,10 @@ def re_register():
 def register_user():
     try:
         email = request.form.get('email')
-        print(email)
         password = request.form.get('password')
-        print(password)
         fname = request.form.get('fname')
-        print(fname)
         lname = request.form.get('lname')
-        print(lname)
         dob = request.form.get('dob')
-        print(dob)
     except:
         print(
             "couldn't find all tokens")
@@ -196,9 +156,9 @@ def register_user():
     cursor = conn.cursor()
     test = isEmailUnique(email)
     if test:
-        print(cursor.execute("INSERT INTO USERS (email, password, gender, dob, hometown, fname, lname) "
-							 "VALUES (%s , %s, %s, %s, %s, %s, %s)",
-							 (email, password, gender, dob, hometown, fname, lname)))
+        cursor.execute("INSERT INTO USERS (email, password, gender, dob, hometown, fname, lname) "
+                       "VALUES (%s , %s, %s, %s, %s, %s, %s)",
+                       (email, password, gender, dob, hometown, fname, lname))
         conn.commit()
         # log user in
         user = User()
@@ -214,6 +174,16 @@ def register_user():
 @app.route("/addfriends", methods=['POST'])
 def addfriends():
     return
+
+
+def getUserNameFromEmail(email):
+   cursor = conn.cursor()
+   query = "SELECT FNAME, LNAME FROM USERS WHERE email = '"+ email +"'"
+   cursor.execute( query )
+   data = cursor.fetchall()
+   fname = str(data[0][0])
+   lname = str(data[0][1])
+   return fname, lname
 
 
 @app.route('/by_tag', methods=['GET'])
@@ -243,7 +213,8 @@ def getUsersPhotos(uid):
 
 def getUserIdFromEmail(email):
     cursor = conn.cursor()
-    cursor.execute("SELECT uid  FROM USERS WHERE email = email")
+    query = "SELECT uid  FROM USERS WHERE email ='"+ email +"'"
+    cursor.execute(query)
     return cursor.fetchone()[0]
 
 
@@ -261,24 +232,136 @@ def isEmailUnique(email):
 
 # end login code
 
-@app.route('/profile')
+def recommend_user():
+    current_user = flask_login.current_user.id
+    CUID = getUserIdFromEmail(current_user)
+    try:
+        uemail = request.form.get('user_mail')
+    except:
+       print(
+             "couldn't find all tokens")  # this prints to shell, end users will not see this (all print statements go to shell)
+       return flask.redirect(flask.url_for('protected'))
+    query = "SELECT U.FNAME, U.LNAME, U.EMAIL, COUNT(*) AS CF " \
+            "FROM USERS AS U, FRIENDSHIP AS F1, FRIENDSHIP AS F2 " \
+            "WHERE "+str(CUID)+\
+                "=F1.UID1 AND F1.UID2=F2.UID1 AND F2.UID2<>"+str(CUID)+" AND F2.UID2=U.UID AND F1.UID2<>F2.UID2 " \
+            "GROUP BY U.UID ORDER BY CF DESC"
+
+    print(query)
+    cursor = conn.cursor()
+    cursor.execute(query)
+    data=cursor.fetchall()
+    return data
+
+@app.route('/profile', methods=['GET'])
 @flask_login.login_required
-def protected():
-
-    uid = getUserIdFromEmail(flask_login.current_user.id)
-    cursor.execute("SELECT IMG_DATA FROM PHOTO WHERE uid = '" + str(uid) + "'")
-    photos = cursor.fetchall()
-    print(photos)
-    cursor.execute("SELECT A_NAME FROM ALBUM WHERE uid = '" + str(uid) + "'")
-    albums = cursor.fetchall()[0]
+def protected( not_found=0, usersList = None ):
+    userid = getUserIdFromEmail(flask_login.current_user.id)
+    print("***{}***".format(flask_login.current_user.id))
+    print("***{}***".format(str(userid)))
+    cursor = conn.cursor()
+    #albums
+    cursor.execute("SELECT A_NAME, AID FROM ALBUM WHERE UID = '" + str(userid) + "'")
+    print(str(userid))
+    albums = cursor.fetchall()
     print(albums)
+    # search
+    query = "SELECT U.FNAME, U.LNAME, U.EMAIL FROM FRIENDSHIP AS F, USERS AS U WHERE F.UID1=" \
+            + str(userid)+ " AND F.UID2=U.UID"
+    friendsList = ()
+    if cursor.execute(query):
+        friendsList = cursor.fetchall()
+        print("Friends: {}".format(friendsList))
 
-    return render_template('hello.html',
-						   name=flask_login.current_user.id,
-						   message="Here's your profile",
-                           photos=photos,
-                           albums=albums,
-                           logged_in=True)
+    firstname, lastname = getUserNameFromEmail(flask_login.current_user.id)
+    recommendations=recommend_user()
+
+    return render_template('profile.html', fname=firstname, lname=lastname, nf=not_found, users=usersList,\
+                           friends=friendsList, recommendations=recommendations, albums= albums )
+
+
+@app.route("/profile", methods=['POST'])
+@flask_login.login_required
+def search_User():
+    current_user = flask_login.current_user.id
+    try:
+        uemail = request.form.get('userSearch')
+    except:
+        print(
+            "couldn't find all tokens")  # this prints to shell, end users will not see this (all print statements go to shell)
+        return flask.redirect(flask.url_for('protected'))
+    cursor = conn.cursor()
+    notSelf = " AND EMAIL <> '"+current_user+"'"
+    query = "SELECT fname, lname, email FROM USERS WHERE email LIKE '"+ uemail +"%'"+notSelf
+    print(query)
+    if ( cursor.execute(query) ):
+        data = cursor.fetchall()
+        return user_results( data )
+    else:
+        return protected( not_found=1 )
+
+
+def user_results(usersList):
+
+    return protected(0, usersList)
+
+
+@app.route('/profile/1', methods=['POST'])
+@flask_login.login_required
+def visit_user():
+    print("mpika")
+    current_user = flask_login.current_user.id
+    try:
+        uemail = request.form.get('user_mail')
+    except:
+        print("couldn't find all tokens")
+        return flask.redirect(flask.url_for('protected'))
+    print( current_user, uemail )
+    firstname, lastname = getUserNameFromEmail(uemail)
+    already=0
+    cuid = getUserIdFromEmail(current_user)
+    ouid = getUserIdFromEmail(uemail)
+    query = "SELECT * FROM FRIENDSHIP WHERE UID1="+str(cuid)+" AND UID2="+str(ouid)
+    if cursor.execute(query):
+        already=1
+    query = "SELECT A_NAME, AID FROM ALBUM WHERE UID =" + str(ouid)
+    cursor.execute(query)
+    albums = cursor.fetchall()
+    print(query)
+    return render_template('otherProfile.html',
+                           fname=firstname, lname=lastname, otherEmail=uemail,
+                           already=already, message="(S)he is a friend of you", albums=albums)
+
+
+@app.route('/user_album', methods=['POST'])
+@flask_login.login_required
+def view_album():
+    try:
+        cur_aid = request.form.get('album_id')
+    except:
+        print("Could find this album: " + str(cur_aid))
+        return flask.redirect(flask.url_for('protected'))
+
+    query = "SELECT * FROM PHOTO WHERE AID=" + str(cur_aid)
+    cursor.execute(query)
+    photos = cursor.fetchall()
+
+    return render_template('view_album.html', photos=photos, aid=cur_aid)
+
+
+@app.route('/other_user_album', methods=['POST'])
+def view_other_album():
+    try:
+        cur_aid = request.form.get('album_id')
+    except:
+        print("Could find this album: " + str(cur_aid))
+        return flask.redirect(flask.url_for('protected'))
+
+    query = "SELECT * FROM PHOTO WHERE AID=" + str(cur_aid)
+    cursor.execute(query)
+    photos = cursor.fetchall()
+
+    return render_template('view_other_album.html', photos=photos, aid=cur_aid)
 
 
 # begin photo uploading code
@@ -322,14 +405,31 @@ def upload_file():
 def create_album():
     if request.method == 'POST':
         uid = getUserIdFromEmail(flask_login.current_user.id)
+        print(str(uid))
         album_name = request.form.get('Name')
-        print(album_name)
+        date_time = datetime.datetime.now()
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO ALBUM (A_NAME, UID) VALUES (%s, %s)", (album_name, uid))
+        cursor.execute("INSERT INTO ALBUM (A_NAME, UID, DOC) VALUES (%s, %s, %s)", (album_name, uid, date_time))
         conn.commit()
         return flask.redirect(flask.url_for('protected'))
     else:
         return render_template('create_album.html')
+
+@app.route('/friendship', methods=['POST'])
+@flask_login.login_required
+def friendship():
+    try:
+        uemail = request.form.get('friend')
+        firstname, lastname = getUserNameFromEmail(uemail)
+        other = getUserIdFromEmail(uemail)
+        current = getUserIdFromEmail(flask_login.current_user.id)
+        print(other, current)
+        cursor.execute("INSERT INTO FRIENDSHIP ( UID1, UID2 ) VALUES (%s, %s)", (current, other))
+        conn.commit()
+        return render_template('otherProfile.html', fname=firstname, lname=lastname, otherEmail=uemail, already=1,
+                               message="Added to your friends' list!")
+    except:
+        print("couldn't find all tokens")  # this prints to shell, end users will not see this (all print statements go to shell)
 
 
 # default page
